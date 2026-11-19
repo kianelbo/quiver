@@ -5,7 +5,7 @@ group = 'com.quiver'
 version = '0.1.0'
 
 application {
-    mainClass = 'com.quiver.server.Main'
+    mainClass = 'com.quiver.Main'
 }
 
 // sourceCompatibility/targetCompatibility go through this Gradle version's own
@@ -35,6 +35,23 @@ test {
 // launch scripts, so no shadow/fat-jar plugin is needed.
 jar {
     manifest {
-        attributes 'Main-Class': 'com.quiver.server.Main'
+        attributes 'Main-Class': 'com.quiver.Main'
+    }
+}
+
+tasks.register('createCliStartScripts', org.gradle.jvm.application.tasks.CreateStartScripts) {
+    applicationName = 'quiver-cli'
+    mainClass = 'com.quiver.cli.Main'
+    classpath = files(tasks.jar.archiveFile, configurations.runtimeClasspath)
+    outputDir = layout.buildDirectory.dir('cli-scripts').get().asFile
+}
+
+distributions {
+    main {
+        contents {
+            from(tasks.named('createCliStartScripts')) {
+                into 'bin'
+            }
+        }
     }
 }

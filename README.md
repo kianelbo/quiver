@@ -44,7 +44,7 @@ and the full query language described above. Sharding and replication are design
 Requires JDK 25 and Gradle.
 
 ```bash
-gradle test     # builds and runs all 104 tests
+gradle test     # builds and runs all tests
 gradle installDist  # creates a runnable distribution with its runtime dependencies
 ```
 
@@ -52,12 +52,24 @@ Start the server with no arguments for an ephemeral database, or pass a WAL path
 durable storage:
 
 ```bash
-build/install/quiver-server/bin/quiver-server mydata.wal
+build/install/quiver-server/bin/quiver-server mydata.wal --host 127.0.0.1 --port 3672
 ```
 
-The server stays running until stopped with Ctrl-C and closes its WAL on shutdown.
-Client connections are not implemented yet; a separate CLI will be added to communicate
-with the server.
+The server listens on `127.0.0.1:3672` by default. To accept connections from other
+machines, pass an externally reachable address with `--host`; do not expose the
+unauthenticated server to untrusted networks.
+
+The distribution also includes a CLI. Run it interactively, or send a QSL script:
+
+```bash
+build/install/quiver-server/bin/quiver-cli
+build/install/quiver-server/bin/quiver-cli -e 'DEFINE FSM order (INITIAL created, TRANSITIONS (created (pay): paid))'
+```
+
+Use `--host HOST` and `--port PORT` with the CLI to connect to a non-default server.
+The client and server exchange newline-delimited JSON over TCP; each request contains a
+`query` string, and each response contains either `results` or an `error`. The server
+stays running until stopped with Ctrl-C and closes its WAL on shutdown.
 
 ### Build requirements
 
