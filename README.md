@@ -56,20 +56,23 @@ build/install/quiver-server/bin/quiver-server mydata.wal --host 127.0.0.1 --port
 ```
 
 The server listens on `127.0.0.1:3672` by default. To accept connections from other
-machines, pass an externally reachable address with `--host`; do not expose the
-unauthenticated server to untrusted networks.
+machines, pass an externally reachable address with `--host`. The server requires
+`QUIVER_PASSWORD` to be set in its environment before startup.
 
 The distribution also includes a CLI. Run it interactively, or send a QSL script:
 
 ```bash
-build/install/quiver-server/bin/quiver-cli
-build/install/quiver-server/bin/quiver-cli -e 'DEFINE FSM order (INITIAL created, TRANSITIONS (created (pay): paid))'
+build/install/quiver-server/bin/quiver-cli --url quiver://127.0.0.1:3672
+build/install/quiver-server/bin/quiver-cli --url quiver://127.0.0.1:3672 -e 'DEFINE FSM order (INITIAL created, TRANSITIONS (created (pay): paid))'
 ```
 
-Use `--host HOST` and `--port PORT` with the CLI to connect to a non-default server.
-The client and server exchange newline-delimited JSON over TCP; each request contains a
-`query` string, and each response contains either `results` or an `error`. The server
-stays running until stopped with Ctrl-C and closes its WAL on shutdown.
+The CLI reads `QUIVER_PASSWORD` from its environment, or prompts for it without echo
+when run in a terminal. It never accepts the password as a command-line argument. The
+client proves knowledge of the password using a fresh, one-time HMAC-SHA256 challenge
+on each TCP connection, so the password itself is not sent over the wire. This protocol
+does not provide transport encryption; use a trusted network or TLS tunnel for remote
+connections. The server stays running until stopped with Ctrl-C and closes its WAL on
+shutdown.
 
 ### Build requirements
 

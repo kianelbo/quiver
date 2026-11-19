@@ -14,6 +14,10 @@ public final class Main {
         String host = DEFAULT_HOST;
         int port = DEFAULT_PORT;
         Path walPath = null;
+        String password = System.getenv("QUIVER_PASSWORD");
+        if (password == null || password.isBlank()) {
+            throw new IllegalStateException("set a non-empty QUIVER_PASSWORD before starting Quiver");
+        }
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -42,7 +46,7 @@ public final class Main {
         QuiverDatabase database = walPath != null
                 ? QuiverDatabase.open(walPath)
                 : QuiverDatabase.ephemeral();
-        try (TcpServer server = new TcpServer(database, host, port)) {
+        try (TcpServer server = new TcpServer(database, host, port, password)) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 server.close();
             }, "quiver-shutdown"));

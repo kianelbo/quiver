@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.quiver.QuiverDatabase;
 import com.quiver.core.instance.FsmInstance;
+import com.quiver.protocol.PasswordAuth;
 import com.quiver.query.exec.QueryResult;
 
 import java.io.BufferedReader;
@@ -18,6 +19,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -33,12 +35,16 @@ public final class TcpServer implements AutoCloseable {
 
     private final QuiverDatabase database;
     private final ServerSocket serverSocket;
+    private final byte[] passwordSalt;
+    private final byte[] passwordKey;
     private final ExecutorService clients = Executors.newVirtualThreadPerTaskExecutor();
     private final Set<Socket> openSockets = ConcurrentHashMap.newKeySet();
     private boolean closed;
 
-    public TcpServer(QuiverDatabase database, String host, int port) throws IOException {
+    public TcpServer(QuiverDatabase database, String host, int port, String password) throws IOException {
         this.database = database;
+        this.passwordSalt = PasswordAuth.newSalt();
+        this.passwordKey = PasswordAuth.deriveKey(password, passwordSalt);
         this.serverSocket = new ServerSocket(port, 50, InetAddress.getByName(host));
     }
 
@@ -68,6 +74,20 @@ public final class TcpServer implements AutoCloseable {
         try (socket;
              BufferedReader reader = socketReader(socket);
              BufferedWriter writer = socketWriter(socket)) {
+            byte[] nonce = PasswordAuth.newNonce();
+            ObjectNode challenge = JSON.createObjectNode()
+                    .put("type", "auth_challenge")
+                    .put("nonce", java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(nonce))
+                    .put("salt", java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(passwordSalt));
+            writer.write(JSON.writeValueAsString(challenge));
+            writer.newLine();
+            writer.flush();
+
+            String authenticationRequest = reader.readLine();
+            if (!authenticate(authenticationRequest, nonce, writer)) {
+                return;
+            }
+
             String line;
             while ((line = reader.readLine()) != null) {
                 ObjectNode response;
@@ -94,6 +114,30 @@ public final class TcpServer implements AutoCloseable {
         } finally {
             openSockets.remove(socket);
         }
+    }
+
+    private boolean authenticate(String requestLine, byte[] nonce, BufferedWriter writer) throws IOException {
+        String proof = null;
+        if (requestLine != null) {
+            try {
+                JsonNode request = JSON.readTree(requestLine);
+                if (request != null && "authenticate".equals(request.path("type").asText())) {
+                    proof = request.path("proof").asText(null);
+                }
+            } catch (JsonProcessingException ignored) {
+                // Invalid authentication messages receive the same generic failure as wrong passwords.
+            }
+        }
+        if (!PasswordAuth.verifyProof(passwordKey, nonce, proof)) {
+            writer.write(JSON.createObjectNode().put("ok", false).put("error", "authentication failed").toString());
+            writer.newLine();
+            writer.flush();
+            return false;
+        }
+        writer.write(JSON.createObjectNode().put("ok", true).put("authenticated", true).toString());
+        writer.newLine();
+        writer.flush();
+        return true;
     }
 
     private static BufferedReader socketReader(Socket socket) throws IOException {
@@ -177,6 +221,7 @@ public final class TcpServer implements AutoCloseable {
                 }
             });
             clients.close();
+            Arrays.fill(passwordKey, (byte) 0);
         }
     }
 }
