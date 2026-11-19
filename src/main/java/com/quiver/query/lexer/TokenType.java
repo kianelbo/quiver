@@ -1,0 +1,19 @@
+package com.quiver.query.lexer;
+
+public enum TokenType {
+    // Keywords
+    DEFINE, FSM, STATES, INITIAL, TERMINAL, ALPHABET, TRANSITIONS,
+    CREATE, WITH, GET, MATCH, WHERE, STATE, IS, HISTORY, LIKE,
+    AND, OR, BEGIN, COMMIT, ROLLBACK, TRUE, FALSE, NULL,
+
+    // Literals / names
+    IDENT, STRING, NUMBER,
+
+    // Punctuation
+    COLON, LPAREN, RPAREN, LBRACE, RBRACE, LBRACKET, RBRACKET,
+    COMMA, SEMICOLON,
+    EQUAL, NOTEQUAL, LT, GT, LE, GE,
+    DOT, STAR, PLUS, QUESTION, PIPE,
+
+    EOF
+}
